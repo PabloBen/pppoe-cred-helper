@@ -44,7 +44,8 @@ def main():
     parser = argparse.ArgumentParser(description="Capture PPPoE credentials safely.")
     parser.add_argument("--interface", help="Ethernet interface (e.g., eth0)")
     parser.add_argument("--isp", help="ISP preset name (e.g., digi, movistar)")
-    parser.add_argument("--vlan", type=int, help="Override VLAN ID")
+    parser.add_argument("--vlan", type=int, help="Override VLAN ID (use --no-vlan for untagged)")
+    parser.add_argument("--no-vlan", action="store_true", help="Do not create a VLAN subinterface (use native/untagged)")
     parser.add_argument("--timeout", type=int, default=120, help="Capture timeout in seconds")
     parser.add_argument("--dry-run", action="store_true", help="Perform no system changes")
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
@@ -99,34 +100,44 @@ def main():
             else:
                 iface = interfaces[0]
 
-    vlan = args.vlan
-    if not vlan:
+    vlan: Optional[int] = args.vlan
+    if args.no_vlan:
+        vlan = None
+    if vlan is None:
         if args.isp:
             for preset in ISP_PRESETS:
                 if args.isp.lower() in preset.name.lower():
                     vlan = preset.vlan
                     break
         
-        if not vlan and not args.json:
+        if vlan is None and not args.json:
             console.print("\n[bold cyan]Select ISP / VLAN:[/bold cyan]")
             for i, p in enumerate(ISP_PRESETS, 1):
                 console.print(f" [ {i} ] {p.name} (VLAN {p.vlan})")
-            console.print(f" [ {len(ISP_PRESETS)+1} ] Manual VLAN")
+            no_vlan_idx = len(ISP_PRESETS) + 1
+            manual_idx = len(ISP_PRESETS) + 2
+            console.print(f" [ {no_vlan_idx} ] No VLAN (native/untagged)")
+            console.print(f" [ {manual_idx} ] Manual VLAN")
             choice = int(console.input("Choice: "))
             if choice <= len(ISP_PRESETS):
                 vlan = ISP_PRESETS[choice-1].vlan
+            elif choice == no_vlan_idx:
+                vlan = None
             else:
                 vlan = int(console.input("Enter VLAN ID: "))
-        elif not vlan:
-            vlan = 6 # Default fallback
+        # For non-interactive / JSON, default to untagged if nothing provided
 
     # 4. System Changes with Rollback
     rollback = RollbackPlan()
     try:
         with rollback:
             # VLAN Setup
-            vlan_iface = setup_vlan(iface, vlan, args.dry_run)
-            rollback.push(f"Remove VLAN {vlan_iface}", remove_vlan, vlan_iface, args.dry_run)
+            if vlan is None:
+                vlan_iface = iface
+                logger.info("Using native interface %s (no VLAN)", iface)
+            else:
+                vlan_iface = setup_vlan(iface, vlan, args.dry_run)
+                rollback.push(f"Remove VLAN {vlan_iface}", remove_vlan, vlan_iface, args.dry_run)
 
             # PPP Options Setup
             options_path = Path("/etc/ppp/options")

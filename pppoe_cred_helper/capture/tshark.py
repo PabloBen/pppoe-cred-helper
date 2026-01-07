@@ -27,7 +27,6 @@ class TSharkCapture:
             "-n",      # Don't resolve names
             "-l",      # Line buffered
             "-T", "text",
-            "-f", "ppoes or pppd", # Filter for PPPoE/PPP
             "-Y", "ppp.protocol == 0xc023" # Filtering for PAP
         ]
 
@@ -40,10 +39,17 @@ class TSharkCapture:
             self.process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1
             )
+            print(f"{cmd}")
+            # Fail fast if tshark bails immediately (bad iface, perms, etc.)
+            if self.process.poll() is not None:
+                err = ""
+                if self.process.stderr:
+                    err = self.process.stderr.read().strip()
+                raise CommandError(cmd, self.process.returncode or 1, err)
             return self.process.stdout
         except Exception as e:
             logger.error("Failed to start tshark: %s", e)
@@ -58,6 +64,6 @@ class TSharkCapture:
             logger.info("Stopping tshark (PID: %d)", self.process.pid)
             self.process.terminate()
             try:
-                self.process.wait(timeout=3)
+                self.process.wait(timeout=3000)
             except subprocess.TimeoutExpired:
                 self.process.kill()

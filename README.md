@@ -17,17 +17,21 @@ A professional, hardened utility to capture PPPoE credentials sent by an ISP rou
 - **Dependencies**: `tshark`, `rp-pppoe`, `ppp`, `iproute2`
 - **Python**: 3.8+ with `netifaces` and `rich`
 
-## Installation
+## Installation (script-only, no pip package)
 
 1. Clone or download this repository.
-2. Install system dependencies:
+2. Install system dependencies and place the script under `/usr/local/bin` (default):
    ```bash
-   sudo ./install.sh
+   ./install.sh
    ```
-3. Install the package:
-   ```bash
-   pip install .
-   ```
+   (script uses sudo only where required)
+
+## Uninstall
+
+Remove the installed script:
+```bash
+./uninstall.sh
+```
 
 ## Usage
 
@@ -45,6 +49,7 @@ sudo pppoe-cred-helper --interface eth0 --isp digi --timeout 300 --reveal-passwo
 - `--interface`: Specify the physical Ethernet interface (e.g., `eth0`).
 - `--isp`: Use a preset for your ISP (e.g., `digi`, `movistar`, `vodafone`).
 - `--vlan`: Manually specify the VLAN ID.
+- `--no-vlan`: Skip VLAN creation and use the native (untagged) interface.
 - `--timeout`: Capture timeout in seconds (default: 120).
 - `--dry-run`: Do not perform any system changes.
 - `--json`: Output result as a machine-readable JSON object.
